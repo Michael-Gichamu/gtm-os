@@ -1,0 +1,40 @@
+{
+  "name": "gtm-os",
+  "version": "0.1.0",
+  "private": true,
+  "description": "GTM Operating System — outbound infrastructure platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm-run-all -p dev:*",
+    "dev:web": "npm --workspace @gtm/web run dev",
+    "dev:api": "npm --workspace @gtm/api run dev",
+    "build": "npm-run-all -s build:db build:shared build:api build:web",
+    "build:db": "npm --workspace @gtm/database run build",
+    "build:shared": "npm --workspace @gtm/shared run build",
+    "build:api": "npm --workspace @gtm/api run build",
+    "build:web": "npm --workspace @gtm/web run build",
+    "db:generate": "npm --workspace @gtm/database run generate",
+    "db:migrate": "npm --workspace @gtm/database run migrate",
+    "db:seed": "npm --workspace @gtm/database run seed",
+    "db:studio": "npm --workspace @gtm/database run studio",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
+    "lint": "npm-run-all -p lint:*",
+    "lint:web": "npm --workspace @gtm/web run lint",
+    "lint:api": "npm --workspace @gtm/api run lint",
+    "typecheck": "npm-run-all -p typecheck:*",
+    "typecheck:web": "npm --workspace @gtm/web run typecheck",
+    "typecheck:api": "npm --workspace @gtm/api run typecheck"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5",
+    "typescript": "^5.6.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
