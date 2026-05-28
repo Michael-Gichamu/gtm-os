@@ -14,6 +14,10 @@
     "jsx": "preserve",
     "incremental": true,
     "plugins": [{ "name": "next" }],
+    // Scope ambient types so tsc doesn't auto-scan the hoisted root
+    // node_modules/@types (which pulls in Express's transitive type packages).
+    // Next's own types load via next-env.d.ts reference directives.
+    "types": ["node", "react", "react-dom"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

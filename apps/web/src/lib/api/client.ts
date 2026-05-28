@@ -38,12 +38,11 @@ export async function api<T>(path: string, opts: ClientOptions = {}): Promise<T>
   const json = text ? safeJsonParse(text) : null;
 
   if (!res.ok) {
-    const message =
-      (json &&
-        typeof json === "object" &&
-        "error" in json &&
-        (json as { error: { message?: string } }).error?.message) ||
-      `Request failed (${res.status})`;
+    let message = `Request failed (${res.status})`;
+    if (json && typeof json === "object" && "error" in json) {
+      const err = (json as { error?: { message?: string } }).error;
+      if (err?.message) message = err.message;
+    }
     throw new ClientApiError(res.status, message, json);
   }
   return json as T;
