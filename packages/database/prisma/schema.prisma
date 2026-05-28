@@ -1,0 +1,281 @@
+// ============================================================================
+// GTM-OS database schema
+//
+// Design principles:
+//   - Entity-agnostic: a Lead is a Company + primary Contact, never a "clinic".
+//     Niche logic (templates, scoring) lives in application code, not the DB.
+//   - Workspace-scoped: every business entity carries workspaceId for
+//     multi-tenancy from day one. Phase 1 ships one workspace per user; later
+//     phases (teams, agencies) inherit the model without migration pain.
+//   - Event log first-class: Activity captures every state change so the
+//     analytics + AI phases can replay history without bolting on a parallel
+//     stream later.
+//   - Configurable pipeline: PipelineStage is a row, not an enum — operators
+//     reorder/rename stages without schema changes.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Auth (NextAuth Prisma Adapter shape)
+// ----------------------------------------------------------------------------
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  name           String?
+  image          String?
+  emailVerified  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  accounts       Account[]
+  sessions       Session[]
+  memberships    WorkspaceMember[]
+  authoredNotes  Note[]    @relation("NoteAuthor")
+  activities     Activity[] @relation("ActivityActor")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ----------------------------------------------------------------------------
+// Tenancy
+// ----------------------------------------------------------------------------
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members        WorkspaceMember[]
+  leads          Lead[]
+  tags           Tag[]
+  pipelineStages PipelineStage[]
+  activities     Activity[]
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(OWNER)
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+}
+
+// ----------------------------------------------------------------------------
+// CRM core
+// ----------------------------------------------------------------------------
+
+model PipelineStage {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  // Ordering position within the pipeline (0-based).
+  position     Int
+  // Soft semantic so analytics can group regardless of name.
+  // OPEN = active, WON = closed-won, LOST = closed-lost.
+  semantic     StageSemantic @default(OPEN)
+  color        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leads     Lead[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, position])
+}
+
+enum StageSemantic {
+  OPEN
+  WON
+  LOST
+}
+
+model Lead {
+  id           String   @id @default(cuid())
+  workspaceId  String
+
+  // ---------- Universal company fields ----------
+  companyName  String
+  industry     String?
+  website      String?
+  country      String?
+  city         String?
+
+  // ---------- Primary contact (denormalized for list-view speed) ----------
+  contactName  String?
+  role         String?
+  email        String?
+  phone        String?
+  linkedinUrl  String?
+
+  // ---------- Outbound state ----------
+  pipelineStageId String?
+  source          String?  // e.g. "manual", "google-maps", "csv"
+  personalization String?  @db.Text
+  notesSummary    String?  @db.Text
+
+  // ---------- Confidence + engagement ----------
+  // 0-100. Phase 6 enrichment writes this; Phase 1 leaves it null.
+  confidenceScore  Int?
+  lastContactedAt  DateTime?
+  lastOpenedAt     DateTime?
+  lastRepliedAt    DateTime?
+
+  // ---------- Bookkeeping ----------
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspace     Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pipelineStage PipelineStage? @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
+  tags          LeadTag[]
+  notes         Note[]
+  activities    Activity[]
+
+  // Email uniqueness is per-workspace, not global, and only when present.
+  @@unique([workspaceId, email])
+  @@index([workspaceId, pipelineStageId])
+  @@index([workspaceId, industry])
+  @@index([workspaceId, createdAt])
+}
+
+model Tag {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  color       String?
+  createdAt   DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  leads     LeadTag[]
+
+  @@unique([workspaceId, name])
+}
+
+model LeadTag {
+  leadId String
+  tagId  String
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([leadId, tagId])
+  @@index([tagId])
+}
+
+model Note {
+  id        String   @id @default(cuid())
+  leadId    String
+  authorId  String?
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lead   Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  author User? @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+}
+
+// ----------------------------------------------------------------------------
+// Event log (the spine the event-driven architecture rides on)
+// ----------------------------------------------------------------------------
+
+model Activity {
+  id          String       @id @default(cuid())
+  workspaceId String
+  leadId      String?
+  actorUserId String?
+  type        ActivityType
+  // Free-form payload describing the event. Each ActivityType has a known
+  // shape (see packages/shared/activity.ts), but the column stays flexible.
+  payload     Json?
+  createdAt   DateTime     @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  lead      Lead?     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  actor     User?     @relation("ActivityActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@index([leadId, createdAt])
+  @@index([type, createdAt])
+}
+
+enum ActivityType {
+  LEAD_CREATED
+  LEAD_UPDATED
+  LEAD_STAGE_CHANGED
+  LEAD_TAGGED
+  LEAD_UNTAGGED
+  LEAD_DELETED
+  NOTE_ADDED
+  // Reserved for later phases — declared now so migrations stay forward-compatible.
+  EMAIL_SENT
+  EMAIL_OPENED
+  EMAIL_CLICKED
+  REPLY_RECEIVED
+  BOUNCE_RECEIVED
+  CAMPAIGN_STARTED
+  CAMPAIGN_COMPLETED
+  FOLLOWUP_SCHEDULED
+  FOLLOWUP_SENT
+}
