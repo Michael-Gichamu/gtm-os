@@ -14,9 +14,10 @@ const nextConfig = {
   // Pull source straight from the workspace packages — avoids a build step
   // during dev and keeps types live.
   transpilePackages: ["@gtm/shared", "@gtm/database"],
-  experimental: {
-    typedRoutes: false,
-  },
+  // Pin the file-tracing root to this monorepo — there's an unrelated
+  // package-lock.json in the parent folder that Next would otherwise infer as
+  // the workspace root.
+  outputFileTracingRoot: resolve(__dirname, "../../"),
   // Reasonable images allowlist for Google profile pics from NextAuth.
   images: {
     remotePatterns: [
