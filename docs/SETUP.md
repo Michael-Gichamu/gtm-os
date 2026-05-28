@@ -36,17 +36,37 @@ cp .env.example .env
 
 Here is every variable, what it does, and whether you must change it for Phase 1.
 
-### Database (no change needed for local dev)
+### Database — **set a real password**
 
 | Variable | Purpose | Action |
 | --- | --- | --- |
 | `POSTGRES_USER` | Postgres username | Leave as `gtm` |
-| `POSTGRES_PASSWORD` | Postgres password | Change to anything for local; **must match** `DATABASE_URL` |
+| `POSTGRES_PASSWORD` | Postgres password | **Generate a strong one** (below) |
 | `POSTGRES_DB` | Database name | Leave as `gtm_os` |
-| `DATABASE_URL` | Full connection string Prisma uses | Keep in sync with the three above |
+| `DATABASE_URL` | Full connection string Prisma uses | Put the **same** password here |
 
-> If you change `POSTGRES_PASSWORD`, update the password inside `DATABASE_URL`
-> too — they must be identical.
+Don't ship the `change_me` placeholder. Generate a strong, **URL-safe** password
+(hex avoids the `@ : / # ? %` characters that would break the connection URL):
+
+```bash
+openssl rand -hex 16
+```
+
+Then set **both** lines to that value (keep user `gtm` and db `gtm_os`):
+
+```env
+POSTGRES_PASSWORD=<paste the hex value>
+DATABASE_URL=postgresql://gtm:<paste the same hex value>@localhost:5432/gtm_os?schema=public
+```
+
+> The password appears in **two** places and they must be identical. If you ever
+> change it *after* first running `npm run docker:up`, you must also recreate the
+> database volume so Postgres picks up the new credentials:
+> `npm run docker:down && docker volume rm gtm-os_gtm_pg_data`.
+>
+> This password is local-only (Postgres listens on `localhost` and `.env` is
+> gitignored), but a strong value is the right habit and keeps the same `.env`
+> safe if you later deploy.
 
 ### Redis (no change needed)
 
@@ -118,7 +138,7 @@ Follow these steps exactly:
    - Developer contact email: your email
 4. **Save and Continue** through "Scopes" (add nothing) and "Test users".
 5. On **Test users**, click **Add Users** and add your own Gmail address
-   (`michaelmatere95@gmail.com`). While the app is in "Testing" mode, only
+   (`michaelmatere606@gmail.com`). While the app is in "Testing" mode, only
    listed test users can sign in — that's fine for now.
 6. **Save and Continue** → **Back to Dashboard**.
 
