@@ -5,7 +5,9 @@ import type {
   LeadListQuery,
   LeadDto,
   Paginated,
+  LeadImportResult,
 } from "@gtm/shared";
+import { leadCreateSchema } from "@gtm/shared";
 import { NotFound } from "../errors.js";
 
 type LeadWithRelations = Prisma.LeadGetPayload<{
@@ -68,6 +70,9 @@ export const LeadService = {
     if (q.stageId) where.pipelineStageId = q.stageId;
     if (q.industry) where.industry = q.industry;
     if (q.tagId) where.tags = { some: { tagId: q.tagId } };
+    // semantic filter joins through the pipelineStage relation — used by
+    // the Clients view (semantic=WON) and active-only segments.
+    if (q.semantic) where.pipelineStage = { semantic: q.semantic };
 
     const items = await prisma.lead.findMany({
       where,
@@ -216,6 +221,84 @@ export const LeadService = {
       return u;
     });
     return toDto(updated);
+  },
+
+  /**
+   * Bulk-import leads from a parsed CSV/Excel sheet. Skips rows whose email
+   * already exists in the workspace (dedupe), records validation errors per
+   * row index, and creates a LEAD_CREATED activity for every imported row.
+   *
+   * Not done in a single transaction so a single bad row doesn't roll back
+   * the whole import — operators typically want partial success with a
+   * reported error list.
+   */
+  async bulkImport(
+    workspaceId: string,
+    actorUserId: string,
+    rawLeads: unknown[],
+  ): Promise<LeadImportResult> {
+    const result: LeadImportResult = { imported: 0, skipped: 0, errors: [] };
+
+    // Pre-fetch all existing emails in the workspace so dedupe is O(1).
+    const existing = await prisma.lead.findMany({
+      where: { workspaceId, email: { not: null } },
+      select: { email: true },
+    });
+    const seenEmails = new Set(
+      existing.map((l) => l.email!.toLowerCase()),
+    );
+
+    for (let i = 0; i < rawLeads.length; i++) {
+      const row = rawLeads[i];
+      const parsed = leadCreateSchema.safeParse(row);
+      if (!parsed.success) {
+        result.errors.push({
+          row: i + 2, // human-friendly: header is row 1, data starts at row 2
+          error: parsed.error.issues.map((iss) => `${iss.path.join(".")}: ${iss.message}`).join("; "),
+        });
+        continue;
+      }
+      const data = parsed.data;
+      const emailKey = data.email?.toLowerCase();
+      if (emailKey && seenEmails.has(emailKey)) {
+        result.skipped++;
+        continue;
+      }
+
+      try {
+        const { tagIds, ...rest } = data;
+        await prisma.$transaction(async (tx) => {
+          const lead = await tx.lead.create({
+            data: {
+              ...rest,
+              workspaceId,
+              source: rest.source ?? "import",
+              ...(tagIds && tagIds.length
+                ? { tags: { create: tagIds.map((tagId) => ({ tagId })) } }
+                : {}),
+            },
+          });
+          await tx.activity.create({
+            data: {
+              workspaceId,
+              leadId: lead.id,
+              actorUserId,
+              type: ActivityType.LEAD_CREATED,
+              payload: { companyName: lead.companyName },
+            },
+          });
+        });
+        if (emailKey) seenEmails.add(emailKey);
+        result.imported++;
+      } catch (e) {
+        result.errors.push({
+          row: i + 2,
+          error: e instanceof Error ? e.message : "Unknown error",
+        });
+      }
+    }
+
+    return result;
   },
 
   async remove(

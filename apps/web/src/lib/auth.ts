@@ -59,17 +59,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           data: { workspaceId: workspace.id, userId, role: WorkspaceRole.OWNER },
           include: { workspace: true },
         });
-        // Seed default pipeline stages for new workspaces.
+        // Seed default pipeline stages for new workspaces. Mirrors the
+        // canonical stages in packages/database/prisma/seed.ts — must stay in
+        // sync. Stages model relationship progression (sales funnel), not
+        // email engagement events (those live in the Activity log).
         const stages = [
-          { name: "New Lead", position: 0, semantic: "OPEN" as const, color: "#94a3b8" },
-          { name: "Contacted", position: 1, semantic: "OPEN" as const, color: "#60a5fa" },
-          { name: "Opened", position: 2, semantic: "OPEN" as const, color: "#38bdf8" },
-          { name: "Replied", position: 3, semantic: "OPEN" as const, color: "#22d3ee" },
-          { name: "Interested", position: 4, semantic: "OPEN" as const, color: "#a78bfa" },
-          { name: "Discovery", position: 5, semantic: "OPEN" as const, color: "#f472b6" },
-          { name: "Proposal Sent", position: 6, semantic: "OPEN" as const, color: "#fb923c" },
-          { name: "Won", position: 7, semantic: "WON" as const, color: "#22c55e" },
-          { name: "Lost", position: 8, semantic: "LOST" as const, color: "#ef4444" },
+          { name: "New Lead",      position: 0, semantic: "OPEN" as const, color: "#94a3b8" },
+          { name: "Qualified",     position: 1, semantic: "OPEN" as const, color: "#60a5fa" },
+          { name: "Contacted",     position: 2, semantic: "OPEN" as const, color: "#38bdf8" },
+          { name: "Engaged",       position: 3, semantic: "OPEN" as const, color: "#22d3ee" },
+          { name: "Discovery",     position: 4, semantic: "OPEN" as const, color: "#a78bfa" },
+          { name: "Proposal Sent", position: 5, semantic: "OPEN" as const, color: "#f472b6" },
+          { name: "Negotiation",   position: 6, semantic: "OPEN" as const, color: "#fb923c" },
+          { name: "Won",           position: 7, semantic: "WON" as const,  color: "#22c55e" },
+          { name: "Lost",          position: 8, semantic: "LOST" as const, color: "#ef4444" },
         ];
         await prisma.pipelineStage.createMany({
           data: stages.map((s) => ({ ...s, workspaceId: workspace.id })),

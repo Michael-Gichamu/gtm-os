@@ -56,6 +56,9 @@ export const leadListQuerySchema = z.object({
   stageId: z.string().optional(),
   industry: z.string().optional(),
   tagId: z.string().optional(),
+  // Filter by stage semantic — OPEN = active leads, WON = clients, LOST = lost.
+  // Powers the Clients view and any future "active vs. closed" segmenting.
+  semantic: z.enum(["OPEN", "WON", "LOST"]).optional(),
 });
 export type LeadListQuery = z.infer<typeof leadListQuerySchema>;
 
@@ -63,6 +66,18 @@ export const leadMoveStageSchema = z.object({
   pipelineStageId: z.string().min(1),
 });
 export type LeadMoveStageInput = z.infer<typeof leadMoveStageSchema>;
+
+/** Bulk-import payload — an array of lead drafts. Dedupes by email. */
+export const leadImportSchema = z.object({
+  leads: z.array(leadCreateSchema).min(1).max(5000),
+});
+export type LeadImportInput = z.infer<typeof leadImportSchema>;
+
+export interface LeadImportResult {
+  imported: number;
+  skipped: number; // existing email in workspace
+  errors: Array<{ row: number; error: string }>;
+}
 
 export interface LeadTagDto {
   id: string;
