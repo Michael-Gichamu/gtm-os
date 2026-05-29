@@ -1,5 +1,5 @@
 # ============================================================================
-# scripts/start.ps1 — one-command local startup for GTM-OS (PowerShell)
+# scripts/start.ps1 - one-command local startup for GTM-OS (PowerShell)
 #
 # Brings up Docker (launches Docker Desktop if needed), starts Postgres +
 # Redis, applies any pending migrations, regenerates the Prisma client, and
@@ -15,13 +15,13 @@
 
 $ErrorActionPreference = "Stop"
 
-# Resolve repo root regardless of where the script is invoked from
+# Resolve repo root regardless of where the script is invoked from.
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location $RepoRoot
 
-function Log($msg) { Write-Host "▸ $msg" -ForegroundColor Cyan }
-function Ok($msg)  { Write-Host "✓ $msg" -ForegroundColor Green }
-function Err($msg) { Write-Host "✗ $msg" -ForegroundColor Red }
+function Log($msg) { Write-Host "[..] $msg" -ForegroundColor Cyan }
+function Ok($msg)  { Write-Host "[OK] $msg" -ForegroundColor Green }
+function Err($msg) { Write-Host "[!!] $msg" -ForegroundColor Red }
 
 # ---------------------------------------------------------------------------
 # 1. Ensure Docker Desktop is running
@@ -31,7 +31,7 @@ docker info > $null 2> $null
 if ($LASTEXITCODE -ne 0) {
   $DockerExe = "C:\Program Files\Docker\Docker\Docker Desktop.exe"
   if (Test-Path $DockerExe) {
-    Log "Docker daemon not reachable — launching Docker Desktop"
+    Log "Docker daemon not reachable - launching Docker Desktop"
     Start-Process $DockerExe -WindowStyle Hidden
   } else {
     Err "Docker Desktop not found at $DockerExe. Start it manually then re-run."
@@ -80,7 +80,7 @@ Ok "Postgres ready"
 Log "Applying pending migrations..."
 npm run --silent db:migrate:deploy | Out-Null
 if ($LASTEXITCODE -ne 0) {
-  Err "Migration failed. Run: npm run db:migrate:deploy  for full output."
+  Err "Migration failed. Run 'npm run db:migrate:deploy' for full output."
   exit 1
 }
 Ok "Schema in sync"
@@ -93,10 +93,10 @@ npm run --silent db:generate | Out-Null
 Ok "Prisma client ready"
 
 # ---------------------------------------------------------------------------
-# 6. Launch dev servers (web :3000, API :4000) — output streams here
+# 6. Launch dev servers (web :3000, API :4000) - output streams here
 # ---------------------------------------------------------------------------
 Log "Starting web (http://localhost:3000) + API (http://localhost:4000)"
-Log "First page compile takes ~30-70 seconds on this machine — then fast."
+Log "First page compile takes 30-70 seconds on this machine, then fast."
 Log "All Next.js + API output appears below. Press Ctrl+C to stop."
 Write-Host ""
 npm run dev
