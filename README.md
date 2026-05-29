@@ -108,9 +108,23 @@ SEED_SAMPLE_DATA=1 npm run db:seed
 
 ### 5. Run
 
+The easiest path is one command — `scripts/start.sh` handles Docker, containers,
+migrations, and launches the dev servers:
+
 ```bash
+bash scripts/start.sh
+```
+
+Or run the individual steps manually:
+
+```bash
+npm run docker:up           # Postgres + Redis
+npm run db:migrate:deploy   # apply any pending migrations
 npm run dev                 # web on :3000, api on :4000
 ```
+
+To stop: `Ctrl+C` in the start.sh terminal, then `bash scripts/stop.sh` to
+shut the containers down (data is preserved).
 
 Open <http://localhost:3000>, sign in with Google. On first sign-in your
 workspace is created automatically with the default pipeline stages.

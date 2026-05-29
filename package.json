@@ -18,6 +18,7 @@
     "build:web": "npm --workspace @gtm/web run build",
     "db:generate": "npm --workspace @gtm/database run generate",
     "db:migrate": "npm --workspace @gtm/database run migrate",
+    "db:migrate:deploy": "npm --workspace @gtm/database run migrate:deploy",
     "db:seed": "npm --workspace @gtm/database run seed",
     "db:studio": "npm --workspace @gtm/database run studio",
     "docker:up": "docker compose --env-file .env -f docker/docker-compose.yml up -d",
