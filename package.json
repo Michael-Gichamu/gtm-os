@@ -8,7 +8,8 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "npm-run-all -p dev:*",
+    "predev": "npm-run-all -s build:db build:shared",
+    "dev": "npm-run-all -p dev:web dev:api",
     "dev:web": "npm --workspace @gtm/web run dev",
     "dev:api": "npm --workspace @gtm/api run dev",
     "build": "npm-run-all -s build:db build:shared build:api build:web",

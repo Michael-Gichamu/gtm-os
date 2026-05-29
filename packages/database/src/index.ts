@@ -1,9 +1,23 @@
-import { PrismaClient } from "@prisma/client";
+import {
+  PrismaClient,
+  Prisma,
+  WorkspaceRole,
+  StageSemantic,
+  ActivityType,
+} from "@prisma/client";
 
-// Re-export the generated client + enums so consumers depend on @gtm/database,
-// not @prisma/client directly. Keeps swap-out (e.g. read replicas, extensions)
-// a one-file change.
-export * from "@prisma/client";
+// Re-export the generated client + enums explicitly. We avoid
+// `export * from "@prisma/client"` because @prisma/client is a CJS module
+// and Turbopack/webpack can't statically analyse a wildcard re-export from
+// CJS — every compile emits a warning. Listing the exports we actually use
+// is both lighter and clearer about the package surface.
+export {
+  PrismaClient,
+  Prisma,
+  WorkspaceRole,
+  StageSemantic,
+  ActivityType,
+};
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
