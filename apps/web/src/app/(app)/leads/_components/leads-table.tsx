@@ -1,8 +1,7 @@
 "use client";
 import * as React from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import type { LeadDto, Paginated, PipelineStageDto } from "@gtm/shared";
 import { Input } from "@/components/ui/input";
@@ -15,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatRelative } from "@/lib/utils";
+import { LeadDetailSheet } from "./lead-detail-sheet";
 
 interface Props {
   initial: Paginated<LeadDto>;
@@ -26,8 +26,11 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const qc = useQueryClient();
 
   const [search, setSearch] = React.useState(initialFilters.search ?? "");
+  const [openLeadId, setOpenLeadId] = React.useState<string | null>(null);
+  const [sheetOpen, setSheetOpen] = React.useState(false);
 
   // Debounce search -> URL update so back/forward + bookmarking work.
   React.useEffect(() => {
@@ -62,6 +65,11 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
     if (value) next.set(key, value);
     else next.delete(key);
     router.replace(`${pathname}?${next.toString()}`);
+  };
+
+  const openLead = (id: string) => {
+    setOpenLeadId(id);
+    setSheetOpen(true);
   };
 
   return (
@@ -109,13 +117,16 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
         )}
       </div>
 
-      <div className="overflow-hidden rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3 text-left font-medium">Company</th>
               <th className="px-4 py-3 text-left font-medium">Contact</th>
+              <th className="px-4 py-3 text-left font-medium">Email</th>
+              <th className="px-4 py-3 text-left font-medium">Phone</th>
               <th className="px-4 py-3 text-left font-medium">Industry</th>
+              <th className="px-4 py-3 text-left font-medium">Source</th>
               <th className="px-4 py-3 text-left font-medium">Stage</th>
               <th className="px-4 py-3 text-left font-medium">Confidence</th>
               <th className="px-4 py-3 text-left font-medium">Updated</th>
@@ -124,51 +135,96 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
           <tbody className="divide-y">
             {data!.items.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                  No leads yet. Click <span className="font-medium">New Lead</span> to add one.
+                <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                  No leads yet. Click <span className="font-medium">New Lead</span> or
+                  <span className="font-medium"> Import</span> to add some.
                 </td>
               </tr>
             ) : (
-              data!.items.map((l) => (
-                <tr key={l.id} className="transition-colors hover:bg-muted/30">
-                  <td className="px-4 py-3">
-                    <Link href={`/leads/${l.id}`} className="font-medium hover:underline">
-                      {l.companyName}
-                    </Link>
-                    {l.city || l.country ? (
-                      <div className="text-xs text-muted-foreground">
-                        {[l.city, l.country].filter(Boolean).join(", ")}
-                      </div>
-                    ) : null}
-                  </td>
-                  <td className="px-4 py-3">
-                    {l.contactName ?? <span className="text-muted-foreground">—</span>}
-                    {l.email ? <div className="text-xs text-muted-foreground">{l.email}</div> : null}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">
-                    {l.industry ?? "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    {l.pipelineStageName ? (
-                      <Badge variant="secondary">{l.pipelineStageName}</Badge>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                    {l.confidenceScore == null ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : (
-                      <ConfidenceBar value={l.confidenceScore} />
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatRelative(l.updatedAt)}</td>
-                </tr>
-              ))
+              data!.items.map((l) => {
+                const stage = stages.find((s) => s.id === l.pipelineStageId);
+                return (
+                  <tr
+                    key={l.id}
+                    onClick={() => openLead(l.id)}
+                    className="cursor-pointer transition-colors hover:bg-muted/40"
+                  >
+                    <td className="px-4 py-3 align-top">
+                      <div className="font-medium">{l.companyName}</div>
+                      {l.city || l.country ? (
+                        <div className="text-xs text-muted-foreground">
+                          {[l.city, l.country].filter(Boolean).join(", ")}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {l.contactName ?? <span className="text-muted-foreground">—</span>}
+                      {l.role ? (
+                        <div className="text-xs text-muted-foreground">{l.role}</div>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {l.email ? (
+                        <a
+                          href={`mailto:${l.email}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline"
+                        >
+                          {l.email}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {l.phone ?? <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="px-4 py-3 align-top text-muted-foreground">
+                      {l.industry ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 align-top text-muted-foreground">
+                      {l.source ?? "—"}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {l.pipelineStageName ? (
+                        <Badge variant={stage?.semantic === "WON" ? "success" : "secondary"}>
+                          {l.pipelineStageName}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top">
+                      {l.confidenceScore == null ? (
+                        <span className="text-muted-foreground">—</span>
+                      ) : (
+                        <ConfidenceBar value={l.confidenceScore} />
+                      )}
+                    </td>
+                    <td className="px-4 py-3 align-top text-muted-foreground whitespace-nowrap">
+                      {formatRelative(l.updatedAt)}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
+
+      <LeadDetailSheet
+        leadId={openLeadId}
+        stages={stages}
+        open={sheetOpen}
+        onOpenChange={(o) => {
+          setSheetOpen(o);
+          if (!o) setOpenLeadId(null);
+        }}
+        onMutated={() => {
+          qc.invalidateQueries({ queryKey: ["leads"] });
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
