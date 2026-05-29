@@ -2,6 +2,7 @@ import { apiServerFetch } from "@/lib/api/server";
 import type { LeadDto, Paginated, PipelineStageDto } from "@gtm/shared";
 import { LeadsTable } from "./_components/leads-table";
 import { NewLeadButton } from "./_components/new-lead-button";
+import { ImportLeadsButton } from "./_components/import-leads-button";
 
 interface SearchParams {
   search?: string;
@@ -36,7 +37,10 @@ export default async function LeadsPage({
             {paginated.items.length} {paginated.items.length === 1 ? "lead" : "leads"} in your workspace
           </p>
         </div>
-        <NewLeadButton stages={stages} />
+        <div className="flex items-center gap-2">
+          <ImportLeadsButton />
+          <NewLeadButton stages={stages} />
+        </div>
       </div>
 
       <LeadsTable initial={paginated} stages={stages} initialFilters={params} />

@@ -22,7 +22,9 @@ app.use(
     credentials: true,
   }),
 );
-app.use(express.json({ limit: "1mb" }));
+// 25mb covers bulk-import payloads (~5000 leads). All endpoints share this
+// budget; for higher loads we'd want per-route limits via a middleware.
+app.use(express.json({ limit: "25mb" }));
 app.use(pinoHttp({ logger }));
 
 // --- Public ---

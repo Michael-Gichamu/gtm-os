@@ -4,6 +4,7 @@ import {
   leadUpdateSchema,
   leadListQuerySchema,
   leadMoveStageSchema,
+  leadImportSchema,
   noteCreateSchema,
 } from "@gtm/shared";
 import { LeadService } from "../services/leadService.js";
@@ -35,6 +36,18 @@ leadRoutes.post(
     const input = leadCreateSchema.parse(req.body);
     const lead = await LeadService.create(workspaceId, userId, input);
     res.status(201).json(lead);
+  }),
+);
+
+// Bulk import from a parsed CSV/Excel sheet. Body: { leads: LeadCreateInput[] }
+// Returns { imported, skipped, errors[] }.
+leadRoutes.post(
+  "/import",
+  asyncHandler(async (req, res) => {
+    const { workspaceId, userId } = ctx(req);
+    const input = leadImportSchema.parse(req.body);
+    const result = await LeadService.bulkImport(workspaceId, userId, input.leads);
+    res.status(200).json(result);
   }),
 );
 
