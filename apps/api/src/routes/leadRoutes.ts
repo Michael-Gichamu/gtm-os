@@ -10,6 +10,7 @@ import {
 import { LeadService } from "../services/leadService.js";
 import { NoteService } from "../services/noteService.js";
 import { ActivityService } from "../services/activityService.js";
+import { EnrollmentService } from "../services/enrollmentService.js";
 import { asyncHandler } from "./asyncHandler.js";
 import { Unauthorized } from "../errors.js";
 
@@ -116,5 +117,13 @@ leadRoutes.get(
   asyncHandler(async (req, res) => {
     const { workspaceId } = ctx(req);
     res.json(await ActivityService.listForLead(workspaceId, req.params.id!));
+  }),
+);
+
+leadRoutes.get(
+  "/:id/enrollments",
+  asyncHandler(async (req, res) => {
+    const { workspaceId } = ctx(req);
+    res.json(await EnrollmentService.listForLead(workspaceId, req.params.id!));
   }),
 );

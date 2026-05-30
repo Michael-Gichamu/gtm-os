@@ -11,6 +11,7 @@ import { pipelineRoutes } from "./routes/pipelineRoutes.js";
 import { tagRoutes } from "./routes/tagRoutes.js";
 import { activityRoutes } from "./routes/activityRoutes.js";
 import { workspaceRoutes } from "./routes/workspaceRoutes.js";
+import { campaignRoutes } from "./routes/campaignRoutes.js";
 
 const app = express();
 
@@ -38,6 +39,7 @@ api.use("/leads", leadRoutes);
 api.use("/pipeline", pipelineRoutes);
 api.use("/tags", tagRoutes);
 api.use("/activities", activityRoutes);
+api.use("/campaigns", campaignRoutes);
 app.use("/v1", api);
 
 app.use(notFoundHandler);
