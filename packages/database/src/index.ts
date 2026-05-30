@@ -4,6 +4,8 @@ import {
   WorkspaceRole,
   StageSemantic,
   ActivityType,
+  CampaignStatus,
+  EnrollmentStatus,
 } from "@prisma/client";
 
 // Re-export the generated client + enums explicitly. We avoid
@@ -17,6 +19,8 @@ export {
   WorkspaceRole,
   StageSemantic,
   ActivityType,
+  CampaignStatus,
+  EnrollmentStatus,
 };
 
 const globalForPrisma = globalThis as unknown as {

@@ -13,6 +13,7 @@ export const activityTypes = [
   "LEAD_UNTAGGED",
   "LEAD_DELETED",
   "NOTE_ADDED",
+  "LEAD_ENROLLED",
   "EMAIL_SENT",
   "EMAIL_OPENED",
   "EMAIL_CLICKED",
@@ -38,8 +39,16 @@ export interface ActivityPayloads {
   LEAD_UNTAGGED: { tagId: string; tagName: string };
   LEAD_DELETED: { companyName: string };
   NOTE_ADDED: { noteId: string; preview: string };
-  // ---- Reserved for later phases ----
-  EMAIL_SENT: { campaignId: string; subject: string };
+  LEAD_ENROLLED: { campaignId: string; campaignName: string };
+  // Phase 2 stubs sends with `stubbed: true`; Phase 3 swaps the worker to
+  // the Gmail API and the same activity type carries real send metadata.
+  EMAIL_SENT: {
+    campaignId: string;
+    enrollmentId: string;
+    step: number;
+    subject: string;
+    stubbed?: boolean;
+  };
   EMAIL_OPENED: { campaignId: string };
   EMAIL_CLICKED: { campaignId: string; url: string };
   REPLY_RECEIVED: { campaignId: string; sentiment?: string };

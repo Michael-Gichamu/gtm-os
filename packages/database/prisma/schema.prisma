@@ -98,6 +98,8 @@ model Workspace {
   tags           Tag[]
   pipelineStages PipelineStage[]
   activities     Activity[]
+  campaigns      Campaign[]
+  enrollments    CampaignEnrollment[]
 }
 
 enum WorkspaceRole {
@@ -190,6 +192,7 @@ model Lead {
   tags          LeadTag[]
   notes         Note[]
   activities    Activity[]
+  enrollments   CampaignEnrollment[]
 
   // Email uniqueness is per-workspace, not global, and only when present.
   @@unique([workspaceId, email])
@@ -268,7 +271,10 @@ enum ActivityType {
   LEAD_UNTAGGED
   LEAD_DELETED
   NOTE_ADDED
-  // Reserved for later phases — declared now so migrations stay forward-compatible.
+  // Campaign events (Phase 2). EMAIL_SENT covers both stubbed (Phase 2)
+  // and real (Phase 3) sends; the payload carries a `stubbed: true` flag
+  // while Phase 3 isn't live.
+  LEAD_ENROLLED
   EMAIL_SENT
   EMAIL_OPENED
   EMAIL_CLICKED
@@ -278,4 +284,107 @@ enum ActivityType {
   CAMPAIGN_COMPLETED
   FOLLOWUP_SCHEDULED
   FOLLOWUP_SENT
+}
+
+// ----------------------------------------------------------------------------
+// Campaigns (Phase 2 — outbound sequence engine)
+//
+// A Campaign is a named outbound effort owned by a workspace, containing an
+// ordered list of SequenceSteps (each a templated email with a delay from
+// the prior step). Leads enroll via CampaignEnrollment, which is the
+// per-lead state machine the BullMQ worker advances.
+// ----------------------------------------------------------------------------
+
+enum CampaignStatus {
+  DRAFT     // being built; sequence not yet active
+  ACTIVE    // running; worker advances enrolled leads
+  PAUSED    // worker skips; existing enrollments hold position
+  ARCHIVED  // read-only history
+}
+
+model Campaign {
+  id          String         @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?        @db.Text
+  status      CampaignStatus @default(DRAFT)
+
+  // Send-window + throttling settings (UTC for Phase 2; per-lead timezone
+  // awareness lands in Phase 3 with real Gmail integration).
+  dailyCap         Int     @default(50)   // max sends per day across this campaign
+  sendWindowStart  Int     @default(9)    // hour 0-23
+  sendWindowEnd    Int     @default(17)
+  jitterMinutes    Int     @default(30)   // randomization +/- minutes between sends
+  stopOnReply      Boolean @default(true) // future-Phase-4 behaviour; flag stored now
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  startedAt  DateTime?
+  archivedAt DateTime?
+
+  workspace   Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  steps       SequenceStep[]
+  enrollments CampaignEnrollment[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, status])
+}
+
+model SequenceStep {
+  id          String   @id @default(cuid())
+  campaignId  String
+  // 0-based order within the campaign. First step has order=0 and delayDays=0.
+  order       Int
+  subject     String
+  body        String   @db.Text
+  // Days after the previous step's send before this step fires. The first
+  // step's delay is from enrollment (typically 0 = send immediately).
+  delayDays   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, order])
+  @@index([campaignId])
+}
+
+enum EnrollmentStatus {
+  ENROLLED         // queued, waiting for first send
+  ACTIVE           // mid-sequence, more steps to come
+  PAUSED           // operator paused; worker skips
+  COMPLETED        // all steps successfully sent
+  STOPPED_ON_REPLY // Phase 4: stopped because the lead replied
+  STOPPED_MANUAL   // operator manually stopped
+  BOUNCED          // Phase 3: stopped because a send hard-bounced
+}
+
+model CampaignEnrollment {
+  id           String           @id @default(cuid())
+  workspaceId  String
+  campaignId   String
+  leadId       String
+
+  // Index into the campaign's ordered steps. 0 = first step not yet sent.
+  currentStep  Int              @default(0)
+  // When the worker should next attempt to advance this enrollment. Null
+  // until the first scheduling pass picks it up.
+  nextSendAt   DateTime?
+  status       EnrollmentStatus @default(ENROLLED)
+
+  enrolledAt   DateTime         @default(now())
+  lastSentAt   DateTime?
+  completedAt  DateTime?
+  pausedAt     DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  campaign  Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead      Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  // A lead can be enrolled in a campaign at most once at a time.
+  @@unique([campaignId, leadId])
+  @@index([workspaceId, status])
+  // The scheduler's hot path: find due enrollments cheaply.
+  @@index([status, nextSendAt])
 }
