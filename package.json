@@ -9,14 +9,16 @@
   ],
   "scripts": {
     "predev": "npm-run-all -s build:db build:shared",
-    "dev": "npm-run-all -p dev:web dev:api",
+    "dev": "npm-run-all -p dev:web dev:api dev:worker",
     "dev:web": "npm --workspace @gtm/web run dev",
     "dev:api": "npm --workspace @gtm/api run dev",
-    "build": "npm-run-all -s build:db build:shared build:api build:web",
+    "dev:worker": "npm --workspace @gtm/worker run dev",
+    "build": "npm-run-all -s build:db build:shared build:api build:web build:worker",
     "build:db": "npm --workspace @gtm/database run build",
     "build:shared": "npm --workspace @gtm/shared run build",
     "build:api": "npm --workspace @gtm/api run build",
     "build:web": "npm --workspace @gtm/web run build",
+    "build:worker": "npm --workspace @gtm/worker run build",
     "db:generate": "npm --workspace @gtm/database run generate",
     "db:migrate": "npm --workspace @gtm/database run migrate",
     "db:migrate:deploy": "npm --workspace @gtm/database run migrate:deploy",
@@ -30,15 +32,17 @@
     "lint:api": "npm --workspace @gtm/api run lint",
     "typecheck": "npm-run-all -p typecheck:*",
     "typecheck:web": "npm --workspace @gtm/web run typecheck",
-    "typecheck:api": "npm --workspace @gtm/api run typecheck"
+    "typecheck:api": "npm --workspace @gtm/api run typecheck",
+    "typecheck:worker": "npm --workspace @gtm/worker run typecheck"
   },
   "devDependencies": {
     "npm-run-all": "^4.1.5",
     "typescript": "^5.6.3"
   },
-  "overridesComment": "Pin a single Prisma client across the workspace. @auth/prisma-adapter's peer range (>=5) lets npm pull @prisma/client v7 to root, which the v5 Prisma CLI cannot generate against. Forcing 5.22.0 keeps one consistent client everywhere.",
+  "overridesComment": "Dedupe transitive deps that ship multiple copies. @prisma/client: pin to v5.22 because @auth/prisma-adapter's open peer pulls v7 otherwise. ioredis: BullMQ nests its own copy which makes Queue({ connection: redis }) trip a structural type mismatch against the worker's direct ioredis.",
   "overrides": {
-    "@prisma/client": "5.22.0"
+    "@prisma/client": "5.22.0",
+    "ioredis": "5.11.0"
   },
   "engines": {
     "node": ">=20.0.0"
