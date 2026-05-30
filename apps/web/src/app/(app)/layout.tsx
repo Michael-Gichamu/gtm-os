@@ -12,12 +12,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { initials } from "@/lib/utils";
-import { LayoutDashboard, Users, KanbanSquare, Activity, LogOut, Trophy } from "lucide-react";
+import { LayoutDashboard, Users, KanbanSquare, Activity, LogOut, Trophy, Megaphone } from "lucide-react";
 
 const NAV = [
   { href: "/dashboard",     label: "Dashboard", icon: LayoutDashboard },
   { href: "/leads",         label: "Leads",     icon: Users },
   { href: "/leads/kanban",  label: "Pipeline",  icon: KanbanSquare },
+  { href: "/campaigns",     label: "Campaigns", icon: Megaphone },
   { href: "/clients",       label: "Clients",   icon: Trophy },
   { href: "/activity",      label: "Activity",  icon: Activity },
 ];

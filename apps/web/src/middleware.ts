@@ -9,7 +9,7 @@ import { getToken } from "next-auth/jwt";
  * round-trip. Pages still re-check the session server-side; this middleware
  * is the cheap pre-filter.
  */
-const PROTECTED = ["/dashboard", "/leads", "/clients", "/activity", "/settings"];
+const PROTECTED = ["/dashboard", "/leads", "/campaigns", "/clients", "/activity", "/settings"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
