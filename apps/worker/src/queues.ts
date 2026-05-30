@@ -11,7 +11,8 @@ export const redis = new Redis(env.REDIS_URL, {
   maxRetriesPerRequest: null,
 });
 
-export const QUEUE_NAME = "gtm:enrollments";
+// BullMQ 5 reserves ":" in queue names (Redis key separator), so we use "-".
+export const QUEUE_NAME = "gtm-enrollments";
 
 /** Job: advance a single enrollment (send current step or finalize). */
 export interface AdvanceJobData {
