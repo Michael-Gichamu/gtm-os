@@ -6,6 +6,7 @@ import { api } from "@/lib/api/client";
 import type { LeadDto, Paginated, PipelineStageDto } from "@gtm/shared";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -15,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { formatRelative } from "@/lib/utils";
 import { LeadDetailSheet } from "./lead-detail-sheet";
+import { BulkActionBar } from "./bulk-action-bar";
 
 interface Props {
   initial: Paginated<LeadDto>;
@@ -31,6 +33,7 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
   const [search, setSearch] = React.useState(initialFilters.search ?? "");
   const [openLeadId, setOpenLeadId] = React.useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = React.useState(false);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
 
   // Debounce search -> URL update so back/forward + bookmarking work.
   React.useEffect(() => {
@@ -56,6 +59,22 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
     initialData: initial,
   });
 
+  // When the filtered set changes, drop any selected IDs that aren't in the
+  // current view — keeps the bar count truthful.
+  React.useEffect(() => {
+    if (!data) return;
+    const visible = new Set(data.items.map((l) => l.id));
+    setSelected((prev) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (visible.has(id)) next.add(id);
+        else changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, [data]);
+
   const industries = Array.from(
     new Set((data?.items ?? []).map((l) => l.industry).filter(Boolean)),
   ) as string[];
@@ -72,8 +91,36 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
     setSheetOpen(true);
   };
 
+  const items = data!.items;
+  const allChecked = items.length > 0 && items.every((l) => selected.has(l.id));
+  const someChecked = !allChecked && items.some((l) => selected.has(l.id));
+
+  function toggleAll() {
+    setSelected((prev) => {
+      if (allChecked) {
+        const next = new Set(prev);
+        for (const l of items) next.delete(l.id);
+        return next;
+      } else {
+        const next = new Set(prev);
+        for (const l of items) next.add(l.id);
+        return next;
+      }
+    });
+  }
+  function toggleOne(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const selectedLeads = items.filter((l) => selected.has(l.id));
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 pb-24">
       <div className="flex flex-wrap items-center gap-2">
         <Input
           placeholder="Search company, contact, or email…"
@@ -121,6 +168,14 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
+              <th className="w-10 px-3 py-3">
+                <Checkbox
+                  checked={allChecked}
+                  indeterminate={someChecked}
+                  onCheckedChange={toggleAll}
+                  aria-label="Select all visible leads"
+                />
+              </th>
               <th className="px-4 py-3 text-left font-medium">Company</th>
               <th className="px-4 py-3 text-left font-medium">Contact</th>
               <th className="px-4 py-3 text-left font-medium">Email</th>
@@ -133,22 +188,32 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {data!.items.length === 0 ? (
+            {items.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={10} className="px-4 py-8 text-center text-muted-foreground">
                   No leads yet. Click <span className="font-medium">New Lead</span> or
                   <span className="font-medium"> Import</span> to add some.
                 </td>
               </tr>
             ) : (
-              data!.items.map((l) => {
+              items.map((l) => {
                 const stage = stages.find((s) => s.id === l.pipelineStageId);
+                const isSelected = selected.has(l.id);
                 return (
                   <tr
                     key={l.id}
                     onClick={() => openLead(l.id)}
-                    className="cursor-pointer transition-colors hover:bg-muted/40"
+                    className={`cursor-pointer transition-colors ${
+                      isSelected ? "bg-accent/40 hover:bg-accent/50" : "hover:bg-muted/40"
+                    }`}
                   >
+                    <td className="px-3 py-3 align-top">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleOne(l.id)}
+                        aria-label={`Select ${l.companyName}`}
+                      />
+                    </td>
                     <td className="px-4 py-3 align-top">
                       <div className="font-medium">{l.companyName}</div>
                       {l.city || l.country ? (
@@ -224,6 +289,13 @@ export function LeadsTable({ initial, stages, initialFilters }: Props) {
           qc.invalidateQueries({ queryKey: ["leads"] });
           router.refresh();
         }}
+      />
+
+      <BulkActionBar
+        selectedIds={Array.from(selected)}
+        selectedLeads={selectedLeads}
+        stages={stages}
+        onClear={() => setSelected(new Set())}
       />
     </div>
   );

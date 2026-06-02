@@ -3,7 +3,6 @@ import type { LeadDto, Paginated, PipelineStageDto } from "@gtm/shared";
 import { LeadsTable } from "./_components/leads-table";
 import { NewLeadButton } from "./_components/new-lead-button";
 import { ImportLeadsButton } from "./_components/import-leads-button";
-import { EnrollLeadsButton } from "./_components/enroll-leads-button";
 
 interface SearchParams {
   search?: string;
@@ -39,10 +38,6 @@ export default async function LeadsPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <EnrollLeadsButton
-            leads={paginated.items}
-            label={`Enroll ${paginated.items.length} ${paginated.items.length === 1 ? "lead" : "leads"}`}
-          />
           <ImportLeadsButton />
           <NewLeadButton stages={stages} />
         </div>
