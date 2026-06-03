@@ -127,6 +127,25 @@ To stop: `Ctrl+C` in the same terminal, then run the matching `stop` script
 (`.\scripts\stop.ps1` or `bash scripts/stop.sh`) to shut the containers down.
 Your database volume is preserved across restarts.
 
+> ⚠️ **Back up before risky Docker operations.** A Docker Desktop "Reset to
+> factory defaults", a `docker volume prune`, or a `docker compose down -v`
+> *will* destroy your `gtm_os` data — the named volume is part of what gets
+> wiped. Use the backup scripts:
+>
+> ```powershell
+> # Snapshot the current DB to .\backups\gtm-os_<timestamp>.sql
+> .\scripts\db-backup.ps1
+>
+> # List backups
+> .\scripts\db-restore.ps1
+>
+> # Restore a specific snapshot (destructive — confirms first)
+> .\scripts\db-restore.ps1 .\backups\gtm-os_20260530-120000.sql
+> ```
+>
+> Bash equivalents: `bash scripts/db-backup.sh`, `bash scripts/db-restore.sh`.
+> The `backups/` folder is gitignored.
+
 Manual sequence if you'd rather run the steps yourself:
 
 ```bash

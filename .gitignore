@@ -8,6 +8,9 @@ build/
 *.tsbuildinfo
 next-env.d.ts
 
+# Database snapshots — don't commit operator data into the repo.
+backups/
+
 .env
 .env.local
 .env.*.local
